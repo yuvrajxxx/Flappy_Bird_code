@@ -1,322 +1,188 @@
-#include "C:\Users\yuvra\Desktop\Flappy bird\FlappyBird\.vscode\SFML\Audio.hpp"
-#include "C:\Users\yuvra\Desktop\Flappy bird\FlappyBird\.vscode\SFML\Graphics.hpp"
 #include <iostream>
-#include <stdlib.h>
+#include <windows.h>
+#include <math.h>
 #include <time.h>
-#include <vector>
-
-using namespace sf;
+#include <conio.h>
 using namespace std;
 
-// rect rect collision detection helper function
-bool collides(float x1, float y1, float w1, float h1, float x2, float y2, float w2, float h2) {
-	if (x1 + w1 >= x2 && x1 <= x2 + w2 && y1 + h1 >= y2 && y1 <= y2 + h2) {
-		return true;
-	}
-	return false;
+void goToXY(short int x,short int y) {
+    COORD coord = { x, y };
+    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 }
 
-int main() {
-	
-	// create the window and set general settings. Plant the seeds
-	RenderWindow window(VideoMode(1000, 600), "Floppy Bird");
-	window.setFramerateLimit(60);
-	window.setKeyRepeatEnabled(false);
-	srand(time(0));
+const int hurdleCount = 4;
 
-	// all sounds and their buffers will rest in this singleton struct
-	struct Sounds {
-		SoundBuffer chingBuffer;
-		SoundBuffer hopBuffer;
-		SoundBuffer dishkBuffer;
-		Sound ching;
-		Sound hop;
-		Sound dishk;
-	} sounds;
+class Flappy_Bird {
+    int hurdlePos[hurdleCount][2];
+    int screenWidth = 79;
+    int screenHeight = 25;
+    int hurdleGap = 8;
+    int betweenHurdleGap;
 
-	// load sounds
-	sounds.chingBuffer.loadFromFile("./audio/score.wav");
-	sounds.hopBuffer.loadFromFile("./audio/flap.wav");
-	sounds.dishkBuffer.loadFromFile("./audio/crash.wav");
-	sounds.ching.setBuffer(sounds.chingBuffer);
-	sounds.hop.setBuffer(sounds.hopBuffer);
-	sounds.dishk.setBuffer(sounds.dishkBuffer);
+    int birdX = 17;
+    int birdY = 15;
 
-	// all textures remain in here. Flappy has 3 textures, which will repeadetly draw, creating the illusion of flying.
-	struct Textures {
-		Texture flappy[3];
-		Texture pipe;
-		Texture background;
-		Texture gameover;
-	} textures;
+    int jump = 4;
+    int score = 0;
+public:
+    Flappy_Bird() {
+        srand(time(NULL));
 
-	// load textures
-	textures.background.loadFromFile("./images/background.png");
-	textures.pipe.loadFromFile("./images/pipe.png");
-	textures.gameover.loadFromFile("./images/gameover.png");
-	textures.flappy[0].loadFromFile("./images/flappy1.png");
-	textures.flappy[1].loadFromFile("./images/flappy2.png");
-	textures.flappy[2].loadFromFile("./images/flappy3.png");
+        betweenHurdleGap = (screenWidth / hurdleCount) + 10;
+        for (int i = 0; i < hurdleCount; i++) {
+            hurdlePos[i][0] = betweenHurdleGap * (i+1);
 
-	// flappy singleton struct.
-	// v = vertical speed
-	// frame = which texture to print
-	struct Flappy {
-		double v = 0;
-		int frame = 0;
-		Sprite sprite;
-	} flappy;
+            int breakPos = rand() % (screenHeight / 3) + hurdleGap;
+            hurdlePos[i][1] = breakPos;
+        }
+    }
+  
+    void printHurdle() {
+        int count = 0;
+        for (int i = 0; i < hurdleCount; i++) {
+            for (int j = 0; j < screenHeight; j++) {
+                
+                if (hurdlePos[i][1] == j) count = hurdleGap;
+                
+                if (count == 0) {
+                    if (hurdlePos[i][0] < screenWidth) {
+                        goToXY(hurdlePos[i][0] + 1, j);
+                        cout << " ";
 
-	// initial position, scale
-	flappy.sprite.setPosition(250, 300);
-	flappy.sprite.setScale(2, 2);
+                        goToXY(hurdlePos[i][0], j);
+                        cout << i;
+                    }
+                }
+                else {
+                    if ((count == 1 || count == hurdleGap) && hurdlePos[i][0] < screenWidth) {
+                        if (hurdlePos[i][0] + 1 > 0) {
+                            goToXY(hurdlePos[i][0] + 1, j);
+                            cout << "   ";
+                        }
+                        
+                        if (hurdlePos[i][0] - 1 > 0) {
+                            goToXY(hurdlePos[i][0] - 1, j);
+                            cout << "===";
+                        }
+                    }
+                    
+                    count--;
+                }
+            }
 
-	// resizable array of sprites representing pipes
-	vector<Sprite> pipes;
+            hurdlePos[i][0]--;
 
-	// waiting = game not started yet
-	// started = playing
-	// gameover = game is over
-	enum GameState { waiting,
-					 started,
-					 gameover };
+            if (hurdlePos[i][0] == -1) {
+                int prev;
+                if (i == 0)
+                    prev = hurdleCount - 1;
+                else
+                    prev = i - 1;
 
+                hurdlePos[i][0] = hurdlePos[prev][0] + betweenHurdleGap;
 
-	// game settings in singleton game struct
-	// frames counts total frames passed since the beginning of time
-	struct Game {
-		int score = 0;
-		int highscore = 0;
-		int frames = 0;
-		GameState gameState = waiting;
-		Sprite background[3];
-		Sprite gameover;
-		Text pressC;
-		Text scoreText;
-		Text highscoreText;
-		Font font;
-	} game;
+                int breakPos = rand() % (screenHeight / 3) + hurdleGap;
+                hurdlePos[i][1] = breakPos;
+            
+                for (int i = 0; i < screenHeight; i++) {
+                    goToXY(0, i);
+                    cout << " ";
+                }
+            }
+        }
+    }
 
-	// load font, set positions, scales etc
-	game.font.loadFromFile("./fonts/flappy.ttf");
-	game.background[0].setTexture(textures.background);
-	game.background[1].setTexture(textures.background);
-	game.background[2].setTexture(textures.background);
-	game.background[0].setScale(1.15625, 1.171875);
-	game.background[1].setScale(1.15625, 1.171875);
-	game.background[2].setScale(1.15625, 1.171875);
-	game.background[1].setPosition(333, 0);
-	game.background[2].setPosition(666, 0);
-	game.gameover.setTexture(textures.gameover);
-	game.gameover.setOrigin(192 / 2, 42 / 2);
-	game.gameover.setPosition(500, 125);
-	game.gameover.setScale(2, 2);
-	game.pressC.setString("Press C to continue");
-	game.pressC.setFont(game.font);
-	game.pressC.setFillColor(Color::White);
-	game.pressC.setCharacterSize(50);
-	game.pressC.setOrigin(game.pressC.getLocalBounds().width / 2, 0);
-	game.pressC.setPosition(500, 250);
-	game.scoreText.setFont(game.font);
-	game.scoreText.setFillColor(Color::White);
-	game.scoreText.setCharacterSize(75);
-	game.scoreText.move(30, 0);
-	game.highscoreText.setFont(game.font);
-	game.highscoreText.setFillColor(Color::White);
-	game.highscoreText.move(30, 80);
+    bool collisionCheck() {
+        if (birdY == 0 || birdY + 3 == screenHeight) return true;
+        
+        for (int i = 0; i < hurdleCount; i++) {
+            if (
+                hurdlePos[i][0] == birdX &&
+                (
+                    birdY >= hurdlePos[i][1] ||
+                    birdY + 3 <= (hurdlePos[i][1] + hurdleGap)
+                )
+            ) {
+                score++;
+            }
+            
+            if (hurdlePos[i][0] >= birdX - 5 &&
+                hurdlePos[i][0] <= birdX &&
+                (   
+                    birdY <= hurdlePos[i][1] ||
+                    birdY + 3 >= (hurdlePos[i][1] + hurdleGap)
+                ) 
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-	// main loop
-	while (window.isOpen()) {
+    void clearBird() {
+        goToXY(birdX - 5, birdY);
+        cout << "   ";
+        goToXY(birdX - 5, birdY + 1);
+        cout << "      ";
+        goToXY(birdX - 5, birdY + 2);
+        cout << "       ";
+    }
 
+    void printScore() {
+        goToXY(0, screenHeight + 4);
+        cout << "Score: " << score;
+    }
 
-		// update score
-		flappy.sprite.setTexture(textures.flappy[1]);
-		game.scoreText.setString(to_string(game.score));
-		game.highscoreText.setString("HI " + to_string(game.highscore));
+    void printBird() {
+            goToXY(birdX - 5, birdY);       cout << " __";
+            goToXY(birdX - 5, birdY + 1);   cout << "/-/o\\";
+            goToXY(birdX - 5, birdY + 2);       cout << "\\_\\-/";
+    }
 
-		// update flappy
-		float fx = flappy.sprite.getPosition().x;
-		float fy = flappy.sprite.getPosition().y;
-		float fw = 34 * flappy.sprite.getScale().x;
-		float fh = 24 * flappy.sprite.getScale().y;
+    void printRoad() {
+        for (int i = 0; i <= screenWidth; i++) {
+            goToXY(i, screenHeight);        cout << "_";
+            goToXY(i, screenHeight + 1);    cout << "/";
+            goToXY(i, screenHeight + 2);    cout << "=";
+        }
+    }
 
-		// flap the wings if playing
-		if (game.gameState == waiting || game.gameState == started) {
+    void play() {
+        printRoad();
+        int someDelay = 0;
+        while (true) {
+            if (GetAsyncKeyState(VK_SPACE)) {
+                birdY -= jump;
+            }
 
-			// change the texture once in 6 frames
-			if (game.frames % 6 == 0) {
-				flappy.frame += 1;
-			}
-			if (flappy.frame == 3) {
-				flappy.frame = 0;
-			}
-		}
+            printHurdle();
+            printBird();
+            printScore();
 
-		flappy.sprite.setTexture(textures.flappy[flappy.frame]);
+            if (collisionCheck()) break;
+            
+            Sleep(100);
+            clearBird();
+            birdY += 1;
+        }
+    }
+};
 
-		// move flappy
-		if (game.gameState == started) {
-			flappy.sprite.move(0, flappy.v);
-			flappy.v += 0.5;
-		}
+int main(){
+    
+    while (true) {
+        Flappy_Bird fb;
+        fb.play();
+        goToXY(30,30);
+        cout << "Do you want to play again? (Y/N)";
+        
+        char ch;
+        cin >> ch;
+        if (ch == 'N' || ch == 'n') {
+            break;
+        }
+        system("cls");
+    }
 
-		// if hits ceiling, stop ascending
-		// if out of screen, game over
-		if (game.gameState == started) {
-			if (fy < 0) {
-				flappy.sprite.setPosition(250, 0);
-				flappy.v = 0;
-			} else if (fy > 600) {
-				flappy.v = 0;
-				game.gameState = gameover;
-				sounds.dishk.play();
-			}
-		}
-
-		// count the score
-		for (vector<Sprite>::iterator itr = pipes.begin(); itr != pipes.end(); itr++) {
-			if (game.gameState == started && (*itr).getPosition().x == 250) {
-				game.score++;
-				sounds.ching.play();
-
-				if (game.score > game.highscore) {
-					game.highscore = game.score;
-				}
-
-				break;
-			}
-		}
-
-		// generate pipes
-		if (game.gameState == started && game.frames % 150 == 0) {
-			int r = rand() % 275 + 75;
-			int gap = 150;
-
-			// lower pipe
-			Sprite pipeL;
-			pipeL.setTexture(textures.pipe);
-			pipeL.setPosition(1000, r + gap);
-			pipeL.setScale(2, 2);
-
-			// upper pipe
-			Sprite pipeU;
-			pipeU.setTexture(textures.pipe);
-			pipeU.setPosition(1000, r);
-			pipeU.setScale(2, -2);
-
-			// push to the array
-			pipes.push_back(pipeL);
-			pipes.push_back(pipeU);
-		}
-
-		// move pipes
-		if (game.gameState == started) {
-			for (vector<Sprite>::iterator itr = pipes.begin(); itr != pipes.end(); itr++) {
-				(*itr).move(-3, 0);
-			}
-		}
-
-		// remove pipes if offscreen
-		if (game.frames % 100 == 0) {
-			vector<Sprite>::iterator startitr = pipes.begin();
-			vector<Sprite>::iterator enditr = pipes.begin();
-
-			for (; enditr != pipes.end(); enditr++) {
-				if ((*enditr).getPosition().x > -104) {
-					break;
-				}
-			}
-
-			pipes.erase(startitr, enditr);
-		}
-
-		// collision detection
-		if (game.gameState == started) {
-			for (vector<Sprite>::iterator itr = pipes.begin(); itr != pipes.end(); itr++) {
-
-				float px, py, pw, ph;
-
-				if ((*itr).getScale().y > 0) {
-					px = (*itr).getPosition().x;
-					py = (*itr).getPosition().y;
-					pw = 52 * (*itr).getScale().x;
-					ph = 320 * (*itr).getScale().y;
-				} else {
-					pw = 52 * (*itr).getScale().x;
-					ph = -320 * (*itr).getScale().y;
-					px = (*itr).getPosition().x;
-					py = (*itr).getPosition().y - ph;
-				}
-
-				if (collides(fx, fy, fw, fh, px, py, pw, ph)) {
-					game.gameState = gameover;
-					sounds.dishk.play();
-				}
-			}
-		}
-
-		// events
-		Event event;
-		while (window.pollEvent(event)) {
-
-			// bye bye
-			if (event.type == Event::Closed) {
-				window.close();
-			}
-			
-			// flap
-			else if (event.type == Event::KeyPressed &&
-					   event.key.code == Keyboard::Space) {
-				if (game.gameState == waiting) {
-					game.gameState = started;
-				}
-
-				if (game.gameState == started) {
-					flappy.v = -8;
-					sounds.hop.play();
-				}
-
-			// restart
-			} else if (event.type == Event::KeyPressed &&
-					   event.key.code == Keyboard::C &&
-					   game.gameState == gameover) {
-				game.gameState = waiting;
-				flappy.sprite.setPosition(250, 300);
-				game.score = 0;
-				pipes.clear();
-			}
-		}
-
-		// clear, draw, display
-		window.clear();
-		window.draw(game.background[0]);
-		window.draw(game.background[1]);
-		window.draw(game.background[2]);
-		window.draw(flappy.sprite);
-
-
-		// draw pipes
-		for (vector<Sprite>::iterator itr = pipes.begin(); itr != pipes.end(); itr++) {
-			window.draw(*itr);
-		}
-
-		// draw scores
-		window.draw(game.scoreText);
-		window.draw(game.highscoreText);
-
-		// gameover. press c to continue
-		if (game.gameState == gameover) {
-			window.draw(game.gameover);
-
-			if (game.frames % 60 < 30) {
-				window.draw(game.pressC);
-			}
-		}
-		window.display();
-
-		// dont forget to update total frames
-		game.frames++;
-	}
-
-	return 0;
+    return 0;
 }
